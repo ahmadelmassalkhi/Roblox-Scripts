@@ -117,6 +117,16 @@ local function OnPlayerRemoving(player)
 	end
 end
 
+--// Cleanup on Teleport
+LocalPlayer.OnTeleport:Connect(function()
+	for _, highlight in pairs(ESP) do
+		if highlight then
+			highlight:Destroy()
+		end
+	end
+	table.clear(ESP)
+end)
+
 --// Init
 for _, player in ipairs(Players:GetPlayers()) do
 	OnPlayerAdded(player)
