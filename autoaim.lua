@@ -10,8 +10,10 @@ local Camera = Workspace.CurrentCamera
 
 --// State
 local rightClickHeld = false
+local currentTarget = nil
+local originalCameraType = Camera.CameraType
 
---// Helper: Get the closest humanoid to screen center
+--// Get Closest Humanoid to Screen Center
 local function GetClosestHumanoid()
 	local closestHumanoid = nil
 	local closestDistance = math.huge
@@ -37,17 +39,19 @@ local function GetClosestHumanoid()
 	return closestHumanoid
 end
 
---// Input Events
+--// Input
 UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = true
 		print("🖱️ Right click held")
 
-		local humanoid = GetClosestHumanoid()
-		if humanoid then
-			print("🎯 Aimed at:", humanoid.Parent.Name)
+		currentTarget = GetClosestHumanoid()
+		if currentTarget then
+			print("🎯 Locking onto:", currentTarget.Parent.Name)
+			originalCameraType = Camera.CameraType
+			Camera.CameraType = Enum.CameraType.Scriptable
 		else
-			print("❌ No humanoid found on screen")
+			print("❌ No target found")
 		end
 	end
 end)
@@ -55,6 +59,26 @@ end)
 UserInputService.InputEnded:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = false
+		currentTarget = nil
+		Camera.CameraType = originalCameraType
 		print("🛑 Right click released")
+	end
+end)
+
+--// Aim Loop
+RunService.RenderStepped:Connect(function()
+	if rightClickHeld then
+		if not currentTarget or currentTarget.Health <= 0 then
+			currentTarget = GetClosestHumanoid()
+		end
+
+		if currentTarget then
+			local hrp = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				local camPos = Camera.CFrame.Position
+				local lookAt = hrp.Position
+				Camera.CFrame = CFrame.new(camPos, lookAt)
+			end
+		end
 	end
 end)
