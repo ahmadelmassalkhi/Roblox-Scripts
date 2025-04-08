@@ -130,9 +130,6 @@ end
 --// Cleanup on Teleport
 LocalPlayer.OnTeleport:Connect(CleanupESP)
 
---// Cleanup on Client Close (more reliable for teleport crash fix)
-game:BindToClose(CleanupESP)
-
 --// Init
 for _, player in ipairs(Players:GetPlayers()) do
 	OnPlayerAdded(player)
