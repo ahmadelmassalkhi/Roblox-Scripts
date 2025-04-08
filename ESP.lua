@@ -117,15 +117,21 @@ local function OnPlayerRemoving(player)
 	end
 end
 
---// Cleanup on Teleport
-LocalPlayer.OnTeleport:Connect(function()
+--// Cleanup Function
+local function CleanupESP()
 	for _, highlight in pairs(ESP) do
 		if highlight then
 			highlight:Destroy()
 		end
 	end
 	table.clear(ESP)
-end)
+end
+
+--// Cleanup on Teleport
+LocalPlayer.OnTeleport:Connect(CleanupESP)
+
+--// Cleanup on Client Close (more reliable for teleport crash fix)
+game:BindToClose(CleanupESP)
 
 --// Init
 for _, player in ipairs(Players:GetPlayers()) do
