@@ -18,6 +18,9 @@ local useTeamColors = Teams and #Teams:GetChildren() > 0
 
 --// Internal
 local ESP = {}
+local updateConnection
+local cleanupDone = false
+local characterConnections = {}
 
 --// Helpers
 local function IsValidPosition(pos)
@@ -101,9 +104,11 @@ end
 local function OnPlayerAdded(player)
 	if player == LocalPlayer then return end
 
-	player.CharacterAdded:Connect(function()
+	local conn = player.CharacterAdded:Connect(function()
 		SetupCharacter(player)
 	end)
+
+	characterConnections[player] = conn
 
 	if player.Character then
 		SetupCharacter(player)
@@ -111,17 +116,42 @@ local function OnPlayerAdded(player)
 end
 
 local function OnPlayerRemoving(player)
+	if characterConnections[player] then
+		characterConnections[player]:Disconnect()
+		characterConnections[player] = nil
+	end
+
 	if ESP[player] then
 		ESP[player]:Destroy()
 		ESP[player] = nil
 	end
 end
 
---// Cleanup Function
+--// Strong Cleanup
 local function CleanupESP()
+	if cleanupDone then return end
+	cleanupDone = true
+
+	-- Disconnect updates
+	if updateConnection then
+		updateConnection:Disconnect()
+	end
+
+	-- Disconnect character connections
+	for player, conn in pairs(characterConnections) do
+		if conn then
+			conn:Disconnect()
+		end
+	end
+	table.clear(characterConnections)
+
+	-- Destroy all highlights
 	for _, highlight in pairs(ESP) do
 		if highlight then
-			highlight:Destroy()
+			pcall(function()
+				highlight.Adornee = nil -- break link to HRP (optional safety)
+				highlight:Destroy()
+			end)
 		end
 	end
 	table.clear(ESP)
@@ -138,9 +168,9 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
---// Main update loop (every other frame for performance)
+--// Main update loop (every other frame)
 local updateIndex = 0
-RunService.RenderStepped:Connect(function()
+updateConnection = RunService.RenderStepped:Connect(function()
 	updateIndex += 1
 	if updateIndex % 2 ~= 0 then return end
 
