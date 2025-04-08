@@ -1,18 +1,15 @@
---// Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
---// References
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
---// State
 local rightClickHeld = false
 local currentTarget = nil
 
---// Get Closest Humanoid to Screen Center
+-- Get Closest Humanoid
 local function GetClosestHumanoid()
 	local closestHumanoid = nil
 	local closestDistance = math.huge
@@ -38,18 +35,11 @@ local function GetClosestHumanoid()
 	return closestHumanoid
 end
 
---// Input
+-- Input
 UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = true
-		print("🖱️ Right click held")
-
 		currentTarget = GetClosestHumanoid()
-		if currentTarget then
-			print("🎯 Target:", currentTarget.Parent.Name)
-		else
-			print("❌ No target found")
-		end
 	end
 end)
 
@@ -57,26 +47,17 @@ UserInputService.InputEnded:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = false
 		currentTarget = nil
-		print("🛑 Right click released")
 	end
 end)
 
---// Aim Loop: Rotate the Character
+-- Main Loop
 RunService.RenderStepped:Connect(function()
-	if rightClickHeld and LocalPlayer.Character then
-		if not currentTarget or currentTarget.Health <= 0 then
-			currentTarget = GetClosestHumanoid()
-		end
-
-		if currentTarget then
-			local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-			local targetRoot = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
-
-			if myRoot and targetRoot then
-				local lookDirection = (targetRoot.Position - myRoot.Position).Unit
-				local newCFrame = CFrame.new(myRoot.Position, myRoot.Position + Vector3.new(lookDirection.X, 0, lookDirection.Z))
-				myRoot.CFrame = newCFrame
-			end
+	if rightClickHeld and currentTarget then
+		local targetHRP = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+		if targetHRP then
+			local camPos = Camera.CFrame.Position
+			local lookVector = (targetHRP.Position - camPos).Unit
+			Camera.CFrame = CFrame.new(camPos, camPos + lookVector)
 		end
 	end
 end)
