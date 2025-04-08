@@ -10,13 +10,15 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
 --// Settings
-local maxDistance = 1000 -- max aim range
-local aimSmoothness = 0.3 -- lower is snappier
+local maxDistance = 1000
+local aimSmoothness = 0.3
 local rightClickActive = false
 
---// Highlight Tracking
+--// Target Tracking
 local currentTarget = nil
 local currentHighlight = nil
+
+print("✅ Auto-aim script loaded")
 
 --// Utility Functions
 local function IsOnScreen(worldPos)
@@ -59,6 +61,10 @@ local function GetClosestTarget()
 		end
 	end
 
+	if closest then
+		print("🎯 Closest Target:", closest.Parent.Name)
+	end
+
 	return closest
 end
 
@@ -72,7 +78,6 @@ local function AimAt(target)
 		return
 	end
 
-	-- Visual highlight
 	if target.Parent ~= currentTarget then
 		if currentHighlight then
 			currentHighlight:Destroy()
@@ -91,25 +96,26 @@ local function AimAt(target)
 		currentTarget = target.Parent
 	end
 
-	-- Aim at target
+	-- Aim camera
 	local cameraCF = Camera.CFrame
 	local targetDirection = (target.Position - cameraCF.Position).Unit
 	local newCFrame = CFrame.lookAt(cameraCF.Position, cameraCF.Position + targetDirection)
 	Camera.CFrame = cameraCF:Lerp(newCFrame, aimSmoothness)
 end
 
---// Input Handlers
+--// Input Handling
 UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickActive = true
+		print("🖱️ Right click held")
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickActive = false
+		print("🛑 Right click released")
 
-		-- Cleanup highlight
 		if currentHighlight then
 			currentHighlight:Destroy()
 			currentHighlight = nil
@@ -124,6 +130,7 @@ RunService.RenderStepped:Connect(function()
 	if Camera.CameraType ~= Enum.CameraType.Custom then return end
 	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
 
+	print("🔍 Scanning for target...")
 	local target = GetClosestTarget()
 	AimAt(target)
 end)
