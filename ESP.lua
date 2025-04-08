@@ -127,7 +127,7 @@ local function CleanupESP()
 	table.clear(ESP)
 end
 
---// Cleanup before teleport
+--// Cleanup on Teleport
 LocalPlayer.OnTeleport:Connect(CleanupESP)
 
 --// Init
@@ -150,19 +150,3 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 end)
-
---// Re-execute after teleport (safe)
-local teleportScriptURL = "https://raw.githubusercontent.com/ahmadelmassalkhi/Roblox-Scripts/main/ESP.lua"
-
-local execScript = string.format([[
-	task.defer(function()
-		repeat task.wait() until game:IsLoaded()
-		loadstring(game:HttpGet("%s"))()
-	end)
-]], teleportScriptURL)
-
-if syn and syn.queue_on_teleport then
-	syn.queue_on_teleport(execScript)
-elseif queue_on_teleport then
-	queue_on_teleport(execScript)
-end
