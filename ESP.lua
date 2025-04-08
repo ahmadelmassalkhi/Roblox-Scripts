@@ -3,7 +3,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Teams = game:GetService("Teams")
-local TeleportService = game:GetService("TeleportService")
 
 --// References
 local LocalPlayer = Players.LocalPlayer
@@ -11,7 +10,7 @@ local Camera = Workspace.CurrentCamera
 
 --// Settings
 local enemyColor = Color3.fromRGB(255, 0, 0)
-local teamColor = Color3.fromRGB(0, 170, 255)
+local teamColor = Color3.fromRGB(0, 0, 255)
 local maxDistanceSquared = 1000 * 1000
 
 --// Team Detection
@@ -19,8 +18,6 @@ local useTeamColors = Teams and #Teams:GetChildren() > 0
 
 --// Internal
 local ESP = {}
-local renderConnection
-local updateIndex = 0
 
 --// Helpers
 local function IsValidPosition(pos)
@@ -120,21 +117,6 @@ local function OnPlayerRemoving(player)
 	end
 end
 
-local function CleanupESP()
-	if renderConnection then
-		renderConnection:Disconnect()
-		renderConnection = nil
-	end
-
-	for _, highlight in pairs(ESP) do
-		if highlight then
-			highlight:Destroy()
-		end
-	end
-
-	table.clear(ESP)
-end
-
 --// Init
 for _, player in ipairs(Players:GetPlayers()) do
 	OnPlayerAdded(player)
@@ -143,11 +125,9 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
-TeleportService.TeleportStarted:Connect(CleanupESP)
-TeleportService.TeleportInitFailed:Connect(CleanupESP)
-
---// Main update loop (every other frame)
-renderConnection = RunService.RenderStepped:Connect(function()
+--// Main update loop (every other frame for performance)
+local updateIndex = 0
+RunService.RenderStepped:Connect(function()
 	updateIndex += 1
 	if updateIndex % 2 ~= 0 then return end
 
