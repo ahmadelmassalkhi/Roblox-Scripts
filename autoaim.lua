@@ -7,12 +7,12 @@ local Workspace = game:GetService("Workspace")
 --// References
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
 
 --// Settings
 local maxDistance = 1000
 local aimSmoothness = 0.3
 local rightClickActive = false
+local visibilityCheck = false -- set to true if you want real raycast visibility
 
 --// Target Tracking
 local currentTarget = nil
@@ -20,13 +20,14 @@ local currentHighlight = nil
 
 print("✅ Auto-aim script loaded")
 
---// Utility Functions
+--// Utilities
 local function IsOnScreen(worldPos)
 	local screenPos, onScreen = Camera:WorldToViewportPoint(worldPos)
 	return onScreen, screenPos
 end
 
 local function IsVisible(origin, target)
+	if not visibilityCheck then return true end
 	local rayParams = RaycastParams.new()
 	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
 	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
@@ -35,26 +36,24 @@ local function IsVisible(origin, target)
 end
 
 local function GetClosestTarget()
-	local closest
-	local smallestDist = math.huge
-	local cameraPos = Camera.CFrame.Position
+	local closest = nil
+	local closestDist = math.huge
+	local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer and player.Character then
-			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-			local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+			local character = player.Character
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			local part = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
 
-			if hrp and humanoid and humanoid.Health > 0 then
-				local onScreen, screenPos = IsOnScreen(hrp.Position)
+			if humanoid and humanoid.Health > 0 and part then
+				local onScreen, screenPos = IsOnScreen(part.Position)
 				if onScreen then
-					local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-					local dist = (screenCenter - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+					local distance = (screenCenter - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
 
-					if dist < smallestDist then
-						if IsVisible(cameraPos, hrp.Position) then
-							smallestDist = dist
-							closest = hrp
-						end
+					if distance < closestDist and IsVisible(Camera.CFrame.Position, part.Position) then
+						closest = part
+						closestDist = distance
 					end
 				end
 			end
@@ -68,8 +67,8 @@ local function GetClosestTarget()
 	return closest
 end
 
-local function AimAt(target)
-	if not target then
+local function AimAt(part)
+	if not part then
 		if currentHighlight then
 			currentHighlight:Destroy()
 			currentHighlight = nil
@@ -78,32 +77,29 @@ local function AimAt(target)
 		return
 	end
 
-	if target.Parent ~= currentTarget then
-		if currentHighlight then
-			currentHighlight:Destroy()
-		end
+	if part.Parent ~= currentTarget then
+		if currentHighlight then currentHighlight:Destroy() end
 
 		local highlight = Instance.new("Highlight")
 		highlight.Name = "AutoAim_Highlight"
-		highlight.Adornee = target.Parent
+		highlight.Adornee = part.Parent
 		highlight.FillColor = Color3.fromRGB(255, 255, 0)
 		highlight.OutlineColor = Color3.fromRGB(255, 170, 0)
 		highlight.FillTransparency = 0.5
 		highlight.OutlineTransparency = 0
-		highlight.Parent = target.Parent
+		highlight.Parent = part.Parent
 
 		currentHighlight = highlight
-		currentTarget = target.Parent
+		currentTarget = part.Parent
 	end
 
-	-- Aim camera
-	local cameraCF = Camera.CFrame
-	local targetDirection = (target.Position - cameraCF.Position).Unit
-	local newCFrame = CFrame.lookAt(cameraCF.Position, cameraCF.Position + targetDirection)
-	Camera.CFrame = cameraCF:Lerp(newCFrame, aimSmoothness)
+	local camPos = Camera.CFrame.Position
+	local direction = (part.Position - camPos).Unit
+	local newCFrame = CFrame.lookAt(camPos, camPos + direction)
+	Camera.CFrame = Camera.CFrame:Lerp(newCFrame, aimSmoothness)
 end
 
---// Input Handling
+--// Input
 UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickActive = true
@@ -127,10 +123,9 @@ end)
 --// Main Loop
 RunService.RenderStepped:Connect(function()
 	if not rightClickActive then return end
-	if Camera.CameraType ~= Enum.CameraType.Custom then return end
-	if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+	if not LocalPlayer.Character then return end
 
 	print("🔍 Scanning for target...")
-	local target = GetClosestTarget()
-	AimAt(target)
+	local targetPart = GetClosestTarget()
+	AimAt(targetPart)
 end)
