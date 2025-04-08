@@ -153,3 +153,16 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 end)
+
+--// Re-execute after teleport
+local teleportScriptURL = "https://raw.githubusercontent.com/ahmadelmassalkhi/Roblox-Scripts/main/ESP.lua"
+
+if syn and syn.queue_on_teleport then
+	syn.queue_on_teleport(string.format([[
+		loadstring(game:HttpGet("%s"))()
+	]], teleportScriptURL))
+elseif queue_on_teleport then
+	queue_on_teleport(string.format([[
+		loadstring(game:HttpGet("%s"))()
+	]], teleportScriptURL))
+end
