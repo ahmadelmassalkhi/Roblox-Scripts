@@ -1,0 +1,146 @@
+--// Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Teams = game:GetService("Teams")
+
+--// References
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+--// ESP Settings
+local enemyColor = Color3.fromRGB(255, 0, 0)
+local teamColor = Color3.fromRGB(0, 170, 255)
+local maxDistanceSquared = 1000 * 1000 -- squared for performance
+
+--// Team Logic
+local useTeamColors = Teams and #Teams:GetChildren() > 0
+
+--// Data
+local ESP = {}
+local cachedPlayers = {}
+
+--// Utility
+local function IsValidPosition(pos)
+	return typeof(pos) == "Vector3" and pos.Magnitude < 1e6 and pos.X == pos.X and pos.Y == pos.Y and pos.Z == pos.Z
+end
+
+local function SetHighlightColor(highlight, color)
+	if highlight.FillColor ~= color then
+		highlight.FillColor = color
+		highlight.OutlineColor = color
+	end
+end
+
+local function CreateOrGetHighlight(player)
+	local existing = ESP[player]
+	if existing and existing.Parent then
+		return existing
+	end
+	if existing then
+		existing:Destroy()
+	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "ESP_Highlight"
+	highlight.FillTransparency = 0.5
+	highlight.OutlineTransparency = 0
+	highlight.Enabled = false
+	highlight.Parent = player.Character
+
+	ESP[player] = highlight
+	return highlight
+end
+
+local function UpdateESP(player)
+	local character = player.Character
+	if not character then return end
+
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp or not IsValidPosition(hrp.Position) then return end
+
+	local highlight = ESP[player]
+	if not highlight then return end
+
+	local distanceSq = (Camera.CFrame.Position - hrp.Position).Magnitude^2
+	if distanceSq < maxDistanceSquared then
+		if not highlight.Enabled then
+			highlight.Enabled = true
+		end
+
+		if useTeamColors and player.Team and LocalPlayer.Team then
+			if player.Team == LocalPlayer.Team then
+				SetHighlightColor(highlight, teamColor)
+			else
+				SetHighlightColor(highlight, enemyColor)
+			end
+		else
+			SetHighlightColor(highlight, enemyColor)
+		end
+	else
+		if highlight.Enabled then
+			highlight.Enabled = false
+		end
+	end
+end
+
+local function SetupCharacter(player)
+	task.defer(function()
+		local character = player.Character
+		if not character then return end
+
+		while not character:IsDescendantOf(Workspace) or not character:FindFirstChild("HumanoidRootPart") do
+			task.wait()
+		end
+
+		CreateOrGetHighlight(player)
+	end)
+end
+
+local function OnPlayerAdded(player)
+	if player == LocalPlayer then return end
+
+	player.CharacterAdded:Connect(function()
+		SetupCharacter(player)
+	end)
+
+	if player.Character then
+		SetupCharacter(player)
+	end
+
+	table.insert(cachedPlayers, player)
+end
+
+local function OnPlayerRemoving(player)
+	local highlight = ESP[player]
+	if highlight then
+		highlight:Destroy()
+		ESP[player] = nil
+	end
+
+	for i, p in ipairs(cachedPlayers) do
+		if p == player then
+			table.remove(cachedPlayers, i)
+			break
+		end
+	end
+end
+
+--// Init
+for _, player in ipairs(Players:GetPlayers()) do
+	OnPlayerAdded(player)
+end
+
+Players.PlayerAdded:Connect(OnPlayerAdded)
+Players.PlayerRemoving:Connect(OnPlayerRemoving)
+
+--// Main update loop (throttled)
+local updateIndex = 0
+RunService.RenderStepped:Connect(function()
+	updateIndex += 1
+	if updateIndex % 2 ~= 0 then return end -- update every other frame
+
+	for _, player in ipairs(cachedPlayers) do
+		UpdateESP(player)
+	end
+end)
