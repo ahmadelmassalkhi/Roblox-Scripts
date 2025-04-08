@@ -11,7 +11,6 @@ local Camera = Workspace.CurrentCamera
 --// State
 local rightClickHeld = false
 local currentTarget = nil
-local originalCameraType = Camera.CameraType
 
 --// Get Closest Humanoid to Screen Center
 local function GetClosestHumanoid()
@@ -47,9 +46,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 
 		currentTarget = GetClosestHumanoid()
 		if currentTarget then
-			print("🎯 Locking onto:", currentTarget.Parent.Name)
-			originalCameraType = Camera.CameraType
-			Camera.CameraType = Enum.CameraType.Scriptable
+			print("🎯 Target:", currentTarget.Parent.Name)
 		else
 			print("❌ No target found")
 		end
@@ -60,24 +57,25 @@ UserInputService.InputEnded:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = false
 		currentTarget = nil
-		Camera.CameraType = originalCameraType
 		print("🛑 Right click released")
 	end
 end)
 
---// Aim Loop
+--// Aim Loop: Rotate the Character
 RunService.RenderStepped:Connect(function()
-	if rightClickHeld then
+	if rightClickHeld and LocalPlayer.Character then
 		if not currentTarget or currentTarget.Health <= 0 then
 			currentTarget = GetClosestHumanoid()
 		end
 
 		if currentTarget then
-			local hrp = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
-			if hrp then
-				local camPos = Camera.CFrame.Position
-				local lookAt = hrp.Position
-				Camera.CFrame = CFrame.new(camPos, lookAt)
+			local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+			local targetRoot = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+
+			if myRoot and targetRoot then
+				local lookDirection = (targetRoot.Position - myRoot.Position).Unit
+				local newCFrame = CFrame.new(myRoot.Position, myRoot.Position + Vector3.new(lookDirection.X, 0, lookDirection.Z))
+				myRoot.CFrame = newCFrame
 			end
 		end
 	end
