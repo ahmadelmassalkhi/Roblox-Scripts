@@ -44,7 +44,8 @@ local function CreateOrGetHighlight(player)
 	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
 
-	if player.Character and player.Character:IsDescendantOf(Workspace) then
+	-- Parent to Character to ensure it shows
+	if player.Character then
 		highlight.Parent = player.Character
 	end
 
@@ -54,7 +55,7 @@ end
 
 local function UpdateESP(player)
 	local character = player.Character
-	if not character or not character:IsDescendantOf(Workspace) then return end
+	if not character then return end
 
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp or not IsValidPosition(hrp.Position) then return end
@@ -101,7 +102,7 @@ local function SetupCharacter(player)
 		end
 
 		local highlight = CreateOrGetHighlight(player)
-		highlight.Parent = player.Character
+		highlight.Parent = character
 	end)
 end
 
@@ -136,10 +137,12 @@ local function CleanupESP()
 	if cleanupDone then return end
 	cleanupDone = true
 
+	-- Disconnect updates
 	if updateConnection then
 		updateConnection:Disconnect()
 	end
 
+	-- Disconnect character connections
 	for player, conn in pairs(characterConnections) do
 		if conn then
 			conn:Disconnect()
@@ -147,10 +150,11 @@ local function CleanupESP()
 	end
 	table.clear(characterConnections)
 
+	-- Destroy all highlights
 	for _, highlight in pairs(ESP) do
 		if highlight then
 			pcall(function()
-				highlight.Adornee = nil
+				highlight.Adornee = nil -- safety
 				highlight:Destroy()
 			end)
 		end
@@ -173,7 +177,7 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
---// Main update loop
+--// Main update loop (every other frame)
 local updateIndex = 0
 updateConnection = RunService.RenderStepped:Connect(function()
 	updateIndex += 1
