@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Teams = game:GetService("Teams")
+local CoreGui = game:GetService("CoreGui")
 
 --// References
 local LocalPlayer = Players.LocalPlayer
@@ -43,7 +44,7 @@ local function CreateOrGetHighlight(player)
 	highlight.FillTransparency = 0.5
 	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
-	highlight.Parent = player.Character
+	highlight.Parent = CoreGui -- safer than parenting to Character
 
 	ESP[player] = highlight
 	return highlight
@@ -51,7 +52,7 @@ end
 
 local function UpdateESP(player)
 	local character = player.Character
-	if not character then return end
+	if not character or not character:IsDescendantOf(Workspace) then return end
 
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp or not IsValidPosition(hrp.Position) then return end
@@ -62,6 +63,7 @@ local function UpdateESP(player)
 	local distanceSq = (Camera.CFrame.Position - hrp.Position).Magnitude^2
 	if distanceSq < maxDistanceSquared then
 		highlight.Enabled = true
+		highlight.Adornee = hrp
 
 		if useTeamColors and player.Team and LocalPlayer.Team then
 			if player.Team == LocalPlayer.Team then
@@ -97,7 +99,8 @@ local function SetupCharacter(player)
 			ESP[player] = nil
 		end
 
-		CreateOrGetHighlight(player)
+		local highlight = CreateOrGetHighlight(player)
+		highlight.Adornee = hrp
 	end)
 end
 
@@ -149,7 +152,7 @@ local function CleanupESP()
 	for _, highlight in pairs(ESP) do
 		if highlight then
 			pcall(function()
-				highlight.Adornee = nil -- break link to HRP (optional safety)
+				highlight.Adornee = nil -- break link to HRP
 				highlight:Destroy()
 			end)
 		end
@@ -158,7 +161,11 @@ local function CleanupESP()
 end
 
 --// Cleanup on Teleport
-LocalPlayer.OnTeleport:Connect(CleanupESP)
+pcall(function()
+	LocalPlayer.OnTeleport:Connect(function()
+		pcall(CleanupESP)
+	end)
+end)
 
 --// Init
 for _, player in ipairs(Players:GetPlayers()) do
