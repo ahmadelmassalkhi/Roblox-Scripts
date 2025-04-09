@@ -3,7 +3,6 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Teams = game:GetService("Teams")
-local CoreGui = game:GetService("CoreGui")
 
 --// References
 local LocalPlayer = Players.LocalPlayer
@@ -44,7 +43,10 @@ local function CreateOrGetHighlight(player)
 	highlight.FillTransparency = 0.5
 	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
-	highlight.Parent = CoreGui -- safer than parenting to Character
+
+	if player.Character and player.Character:IsDescendantOf(Workspace) then
+		highlight.Parent = player.Character
+	end
 
 	ESP[player] = highlight
 	return highlight
@@ -63,7 +65,6 @@ local function UpdateESP(player)
 	local distanceSq = (Camera.CFrame.Position - hrp.Position).Magnitude^2
 	if distanceSq < maxDistanceSquared then
 		highlight.Enabled = true
-		highlight.Adornee = hrp
 
 		if useTeamColors and player.Team and LocalPlayer.Team then
 			if player.Team == LocalPlayer.Team then
@@ -100,7 +101,7 @@ local function SetupCharacter(player)
 		end
 
 		local highlight = CreateOrGetHighlight(player)
-		highlight.Adornee = hrp
+		highlight.Parent = player.Character
 	end)
 end
 
@@ -135,12 +136,10 @@ local function CleanupESP()
 	if cleanupDone then return end
 	cleanupDone = true
 
-	-- Disconnect updates
 	if updateConnection then
 		updateConnection:Disconnect()
 	end
 
-	-- Disconnect character connections
 	for player, conn in pairs(characterConnections) do
 		if conn then
 			conn:Disconnect()
@@ -148,11 +147,10 @@ local function CleanupESP()
 	end
 	table.clear(characterConnections)
 
-	-- Destroy all highlights
 	for _, highlight in pairs(ESP) do
 		if highlight then
 			pcall(function()
-				highlight.Adornee = nil -- break link to HRP
+				highlight.Adornee = nil
 				highlight:Destroy()
 			end)
 		end
@@ -175,7 +173,7 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
---// Main update loop (every other frame)
+--// Main update loop
 local updateIndex = 0
 updateConnection = RunService.RenderStepped:Connect(function()
 	updateIndex += 1
