@@ -21,6 +21,7 @@ local ESP = {}
 local updateConnection
 local cleanupDone = false
 local characterConnections = {}
+local shuttingDown = false
 
 --// Helpers
 local function IsValidPosition(pos)
@@ -35,7 +36,7 @@ local function CreateOrGetHighlight(player)
 		return existing
 	end
 	if existing then
-		existing:Destroy()
+		pcall(function() existing:Destroy() end)
 	end
 
 	local highlight = Instance.new("Highlight")
@@ -44,8 +45,7 @@ local function CreateOrGetHighlight(player)
 	highlight.OutlineTransparency = 0
 	highlight.Enabled = false
 
-	-- Parent to Character to ensure it shows
-	if player.Character then
+	if player.Character and player.Character:IsDescendantOf(Workspace) then
 		highlight.Parent = player.Character
 	end
 
@@ -54,34 +54,37 @@ local function CreateOrGetHighlight(player)
 end
 
 local function UpdateESP(player)
-	local character = player.Character
-	if not character then return end
+	pcall(function()
+		if shuttingDown then return end
+		local character = player.Character
+		if not character then return end
 
-	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp or not IsValidPosition(hrp.Position) then return end
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		if not hrp or not IsValidPosition(hrp.Position) then return end
 
-	local highlight = ESP[player]
-	if not highlight then return end
+		local highlight = ESP[player]
+		if not highlight then return end
 
-	local distanceSq = (Camera.CFrame.Position - hrp.Position).Magnitude^2
-	if distanceSq < maxDistanceSquared then
-		highlight.Enabled = true
+		local distanceSq = (Camera.CFrame.Position - hrp.Position).Magnitude^2
+		if distanceSq < maxDistanceSquared then
+			highlight.Enabled = true
 
-		if useTeamColors and player.Team and LocalPlayer.Team then
-			if player.Team == LocalPlayer.Team then
-				highlight.FillColor = teamColor
-				highlight.OutlineColor = teamColor
+			if useTeamColors and player.Team and LocalPlayer.Team then
+				if player.Team == LocalPlayer.Team then
+					highlight.FillColor = teamColor
+					highlight.OutlineColor = teamColor
+				else
+					highlight.FillColor = enemyColor
+					highlight.OutlineColor = enemyColor
+				end
 			else
 				highlight.FillColor = enemyColor
 				highlight.OutlineColor = enemyColor
 			end
 		else
-			highlight.FillColor = enemyColor
-			highlight.OutlineColor = enemyColor
+			highlight.Enabled = false
 		end
-	else
-		highlight.Enabled = false
-	end
+	end)
 end
 
 local function SetupCharacter(player)
@@ -97,12 +100,14 @@ local function SetupCharacter(player)
 		end
 
 		if ESP[player] then
-			ESP[player]:Destroy()
+			pcall(function() ESP[player]:Destroy() end)
 			ESP[player] = nil
 		end
 
 		local highlight = CreateOrGetHighlight(player)
-		highlight.Parent = character
+		if character:IsDescendantOf(Workspace) then
+			highlight.Parent = character
+		end
 	end)
 end
 
@@ -127,22 +132,20 @@ local function OnPlayerRemoving(player)
 	end
 
 	if ESP[player] then
-		ESP[player]:Destroy()
+		pcall(function() ESP[player]:Destroy() end)
 		ESP[player] = nil
 	end
 end
 
---// Strong Cleanup
 local function CleanupESP()
 	if cleanupDone then return end
 	cleanupDone = true
 
-	-- Disconnect updates
 	if updateConnection then
 		updateConnection:Disconnect()
+		updateConnection = nil
 	end
 
-	-- Disconnect character connections
 	for player, conn in pairs(characterConnections) do
 		if conn then
 			conn:Disconnect()
@@ -150,11 +153,10 @@ local function CleanupESP()
 	end
 	table.clear(characterConnections)
 
-	-- Destroy all highlights
 	for _, highlight in pairs(ESP) do
 		if highlight then
 			pcall(function()
-				highlight.Adornee = nil -- safety
+				highlight.Adornee = nil
 				highlight:Destroy()
 			end)
 		end
@@ -162,10 +164,19 @@ local function CleanupESP()
 	table.clear(ESP)
 end
 
+--// Game closing
+game:BindToClose(function()
+	shuttingDown = true
+end)
+
 --// Cleanup on Teleport
 pcall(function()
 	LocalPlayer.OnTeleport:Connect(function()
 		pcall(CleanupESP)
+		if updateConnection then
+			updateConnection:Disconnect()
+			updateConnection = nil
+		end
 	end)
 end)
 
@@ -180,6 +191,8 @@ Players.PlayerRemoving:Connect(OnPlayerRemoving)
 --// Main update loop (every other frame)
 local updateIndex = 0
 updateConnection = RunService.RenderStepped:Connect(function()
+	if shuttingDown then return end
+
 	updateIndex += 1
 	if updateIndex % 2 ~= 0 then return end
 
