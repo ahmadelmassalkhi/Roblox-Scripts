@@ -20,8 +20,8 @@ local useTeamColors = Teams and #Teams:GetChildren() > 0
 local ESP = {}
 local updateConnection
 local cleanupDone = false
+local teleporting = false
 local characterConnections = {}
-local shuttingDown = false
 
 --// Helpers
 local function IsValidPosition(pos)
@@ -55,28 +55,27 @@ end
 
 local function UpdateESP(player)
 	pcall(function()
-		if shuttingDown then return end
+		if teleporting then return end
 		local character = player.Character
 		if not character then return end
 
 		local hrp = character:FindFirstChild("HumanoidRootPart")
 		if not hrp or not IsValidPosition(hrp.Position) then return end
 
+		local camPos = Camera and Camera.CFrame.Position
+		if not camPos then return end
+
 		local highlight = ESP[player]
 		if not highlight then return end
 
-		local distanceSq = (Camera.CFrame.Position - hrp.Position).Magnitude^2
+		local distanceSq = (camPos - hrp.Position).Magnitude^2
 		if distanceSq < maxDistanceSquared then
 			highlight.Enabled = true
 
 			if useTeamColors and player.Team and LocalPlayer.Team then
-				if player.Team == LocalPlayer.Team then
-					highlight.FillColor = teamColor
-					highlight.OutlineColor = teamColor
-				else
-					highlight.FillColor = enemyColor
-					highlight.OutlineColor = enemyColor
-				end
+				local sameTeam = player.Team == LocalPlayer.Team
+				highlight.FillColor = sameTeam and teamColor or enemyColor
+				highlight.OutlineColor = sameTeam and teamColor or enemyColor
 			else
 				highlight.FillColor = enemyColor
 				highlight.OutlineColor = enemyColor
@@ -164,19 +163,11 @@ local function CleanupESP()
 	table.clear(ESP)
 end
 
---// Game closing
-game:BindToClose(function()
-	shuttingDown = true
-end)
-
---// Cleanup on Teleport
+--// Handle Teleport
 pcall(function()
 	LocalPlayer.OnTeleport:Connect(function()
+		teleporting = true
 		pcall(CleanupESP)
-		if updateConnection then
-			updateConnection:Disconnect()
-			updateConnection = nil
-		end
 	end)
 end)
 
@@ -188,10 +179,10 @@ end
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
---// Main update loop (every other frame)
+--// Update loop
 local updateIndex = 0
 updateConnection = RunService.RenderStepped:Connect(function()
-	if shuttingDown then return end
+	if teleporting then return end
 
 	updateIndex += 1
 	if updateIndex % 2 ~= 0 then return end
