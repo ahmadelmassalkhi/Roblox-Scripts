@@ -1,14 +1,18 @@
+--// Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
+--// Variables
 local rightClickHeld = false
 local currentTarget = nil
+local renderConnection = nil
+local inputBeganConn, inputEndedConn = nil, nil
 
+--// Functions
 local function IsSameTeam(player)
 	return LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team
 end
@@ -37,26 +41,46 @@ local function GetClosestHumanoid()
 	return closest
 end
 
-UserInputService.InputBegan:Connect(function(input, processed)
+--// Input handlers
+inputBeganConn = UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = true
 		currentTarget = GetClosestHumanoid()
 	end
 end)
 
-UserInputService.InputEnded:Connect(function(input, processed)
+inputEndedConn = UserInputService.InputEnded:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = false
 		currentTarget = nil
 	end
 end)
 
-RunService.RenderStepped:Connect(function()
+--// Aimbot render loop
+renderConnection = RunService.RenderStepped:Connect(function()
 	if not rightClickHeld or not currentTarget then return end
 
-	local targetHRP = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+	local targetHRP = currentTarget.Parent and currentTarget.Parent:FindFirstChild("HumanoidRootPart")
 	if not targetHRP then return end
 
 	local camPos = Camera.CFrame.Position
 	Camera.CFrame = CFrame.new(camPos, targetHRP.Position)
+end)
+
+--// Cleanup on teleport or session end
+LocalPlayer.OnTeleport:Connect(function()
+	if renderConnection then
+		renderConnection:Disconnect()
+		renderConnection = nil
+	end
+	if inputBeganConn then
+		inputBeganConn:Disconnect()
+		inputBeganConn = nil
+	end
+	if inputEndedConn then
+		inputEndedConn:Disconnect()
+		inputEndedConn = nil
+	end
+	currentTarget = nil
+	rightClickHeld = false
 end)
