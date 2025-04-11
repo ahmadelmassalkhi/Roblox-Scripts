@@ -11,15 +11,25 @@ local rightClickHeld = false
 local currentTarget = nil
 local renderConnection = nil
 local inputBeganConn, inputEndedConn = nil, nil
+local PREFER_PLAYER_INSIGHT = true  -- Flag to prefer players in sight
 
 --// Functions
 local function IsSameTeam(player)
 	return LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team
 end
 
+local function IsInSight(hrp)
+	local ray = Ray.new(Camera.CFrame.Position, (hrp.Position - Camera.CFrame.Position).Unit * 500)
+	local hitPart = Workspace:FindPartOnRay(ray, LocalPlayer.Character, false, true)
+	return hitPart == hrp
+end
+
 local function GetClosestHumanoid()
 	local closest, minDist = nil, math.huge
 	local screenCenter = Camera.ViewportSize * 0.5
+	local closestDistToCenter = math.huge
+	local closestInSight = nil
+	local closestBehindWall = nil
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player == LocalPlayer or not player.Character or IsSameTeam(player) then continue end
@@ -32,13 +42,35 @@ local function GetClosestHumanoid()
 		if not onScreen then continue end
 
 		local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-		if dist < minDist then
-			minDist = dist
-			closest = humanoid
+		if PREFER_PLAYER_INSIGHT then
+			if IsInSight(hrp) then
+				if dist < closestDistToCenter then
+					closestDistToCenter = dist
+					closestInSight = humanoid
+				end
+			else
+				if dist < minDist then
+					minDist = dist
+					closestBehindWall = humanoid
+				end
+			end
+		else
+			if dist < minDist then
+				minDist = dist
+				closest = humanoid
+			end
 		end
 	end
 
-	return closest
+	if PREFER_PLAYER_INSIGHT then
+		if closestInSight then
+			return closestInSight  -- Prefer the in-sight target
+		else
+			return closestBehindWall  -- Fall back to the behind-wall target
+		end
+	end
+
+	return closest  -- Default to closest if no preference
 end
 
 --// Input handlers
