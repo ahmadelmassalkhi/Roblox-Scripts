@@ -9,7 +9,7 @@ local Camera = Workspace.CurrentCamera
 local rightClickHeld = false
 local currentTarget = nil
 
--- Get Closest Humanoid
+-- Get Closest Humanoid (ignores teammates if teams exist)
 local function GetClosestHumanoid()
 	local closestHumanoid = nil
 	local closestDistance = math.huge
@@ -17,15 +17,21 @@ local function GetClosestHumanoid()
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= LocalPlayer and player.Character then
-			local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-			local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-			if hrp and humanoid and humanoid.Health > 0 then
-				local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-				if onScreen then
-					local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-					if dist < closestDistance then
-						closestDistance = dist
-						closestHumanoid = humanoid
+			local sameTeam = false
+			if LocalPlayer.Team and player.Team then
+				sameTeam = LocalPlayer.Team == player.Team
+			end
+			if not sameTeam then
+				local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+				local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+				if hrp and humanoid and humanoid.Health > 0 then
+					local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+					if onScreen then
+						local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+						if dist < closestDistance then
+							closestDistance = dist
+							closestHumanoid = humanoid
+						end
 					end
 				end
 			end
@@ -35,7 +41,7 @@ local function GetClosestHumanoid()
 	return closestHumanoid
 end
 
--- Input
+-- Input handlers
 UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = true
@@ -50,7 +56,7 @@ UserInputService.InputEnded:Connect(function(input, processed)
 	end
 end)
 
--- Main Loop
+-- Main loop
 RunService.RenderStepped:Connect(function()
 	if rightClickHeld and currentTarget then
 		local targetHRP = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
