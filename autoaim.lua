@@ -9,39 +9,34 @@ local Camera = Workspace.CurrentCamera
 local rightClickHeld = false
 local currentTarget = nil
 
--- Get Closest Humanoid (ignores teammates if teams exist)
+local function IsSameTeam(player)
+	return LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team
+end
+
 local function GetClosestHumanoid()
-	local closestHumanoid = nil
-	local closestDistance = math.huge
-	local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+	local closest, minDist = nil, math.huge
+	local screenCenter = Camera.ViewportSize * 0.5
 
 	for _, player in ipairs(Players:GetPlayers()) do
-		if player ~= LocalPlayer and player.Character then
-			local sameTeam = false
-			if LocalPlayer.Team and player.Team then
-				sameTeam = LocalPlayer.Team == player.Team
-			end
-			if not sameTeam then
-				local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-				local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-				if hrp and humanoid and humanoid.Health > 0 then
-					local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-					if onScreen then
-						local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-						if dist < closestDistance then
-							closestDistance = dist
-							closestHumanoid = humanoid
-						end
-					end
-				end
-			end
+		if player == LocalPlayer or not player.Character or IsSameTeam(player) then continue end
+
+		local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+		local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+		if not hrp or not humanoid or humanoid.Health <= 0 then continue end
+
+		local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+		if not onScreen then continue end
+
+		local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+		if dist < minDist then
+			minDist = dist
+			closest = humanoid
 		end
 	end
 
-	return closestHumanoid
+	return closest
 end
 
--- Input handlers
 UserInputService.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		rightClickHeld = true
@@ -56,14 +51,12 @@ UserInputService.InputEnded:Connect(function(input, processed)
 	end
 end)
 
--- Main loop
 RunService.RenderStepped:Connect(function()
-	if rightClickHeld and currentTarget then
-		local targetHRP = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
-		if targetHRP then
-			local camPos = Camera.CFrame.Position
-			local lookVector = (targetHRP.Position - camPos).Unit
-			Camera.CFrame = CFrame.new(camPos, camPos + lookVector)
-		end
-	end
+	if not rightClickHeld or not currentTarget then return end
+
+	local targetHRP = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
+	if not targetHRP then return end
+
+	local camPos = Camera.CFrame.Position
+	Camera.CFrame = CFrame.new(camPos, targetHRP.Position)
 end)
