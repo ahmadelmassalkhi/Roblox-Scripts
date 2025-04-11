@@ -25,12 +25,13 @@ local function IsInSight(hrp)
 end
 
 local function GetClosestHumanoid()
-	local closest, minDist = nil, math.huge
-	local screenCenter = Camera.ViewportSize * 0.5
-	local closestDistToCenter = math.huge
 	local closestInSight = nil
 	local closestBehindWall = nil
+	local minDistToCenterInSight = math.huge
+	local minDistToCenterBehindWall = math.huge
+	local screenCenter = Camera.ViewportSize * 0.5
 
+	-- Loop through all players
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player == LocalPlayer or not player.Character or IsSameTeam(player) then continue end
 
@@ -41,36 +42,37 @@ local function GetClosestHumanoid()
 		local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 		if not onScreen then continue end
 
-		local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
-		if PREFER_PLAYER_INSIGHT then
-			if IsInSight(hrp) then
-				if dist < closestDistToCenter then
-					closestDistToCenter = dist
-					closestInSight = humanoid
-				end
-			else
-				if dist < minDist then
-					minDist = dist
-					closestBehindWall = humanoid
-				end
+		local distToCenter = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
+
+		if IsInSight(hrp) then
+			-- If player is in sight
+			if distToCenter < minDistToCenterInSight then
+				minDistToCenterInSight = distToCenter
+				closestInSight = humanoid
 			end
 		else
-			if dist < minDist then
-				minDist = dist
-				closest = humanoid
+			-- If player is behind a wall
+			if distToCenter < minDistToCenterBehindWall then
+				minDistToCenterBehindWall = distToCenter
+				closestBehindWall = humanoid
 			end
 		end
 	end
 
+	-- Prefer in-sight player if flag is set
 	if PREFER_PLAYER_INSIGHT then
 		if closestInSight then
 			return closestInSight  -- Prefer the in-sight target
-		else
-			return closestBehindWall  -- Fall back to the behind-wall target
 		end
 	end
 
-	return closest  -- Default to closest if no preference
+	-- Return whichever target is closer (either behind wall or in sight)
+	if closestInSight and closestBehindWall then
+		return minDistToCenterInSight < minDistToCenterBehindWall and closestInSight or closestBehindWall
+	end
+
+	-- Fall back to whatever is found (either behind wall or in sight)
+	return closestInSight or closestBehindWall
 end
 
 --// Input handlers
