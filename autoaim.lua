@@ -9,22 +9,8 @@ local Camera = Workspace.CurrentCamera
 local rightClickHeld = false
 local currentTarget = nil
 
-local IGNORE_WALLS = false -- true = aimbot through walls, false = only aim at visible targets
-
 local function IsSameTeam(player)
 	return LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team
-end
-
-local function IsVisible(targetPos, targetCharacter)
-	local origin = Camera.CFrame.Position
-	local direction = targetPos - origin
-	local raycastParams = RaycastParams.new()
-	raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, targetCharacter, Camera}
-	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-	raycastParams.IgnoreWater = true
-
-	local result = Workspace:Raycast(origin, direction.Unit * direction.Magnitude, raycastParams)
-	return not result or result.Instance:IsDescendantOf(targetCharacter)
 end
 
 local function GetClosestHumanoid()
@@ -40,8 +26,6 @@ local function GetClosestHumanoid()
 
 		local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 		if not onScreen then continue end
-
-		if not IGNORE_WALLS and not IsVisible(hrp.Position, player.Character) then continue end
 
 		local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 		if dist < minDist then
@@ -68,12 +52,7 @@ UserInputService.InputEnded:Connect(function(input, processed)
 end)
 
 RunService.RenderStepped:Connect(function()
-	if not rightClickHeld then return end
-
-	if not currentTarget or currentTarget.Health <= 0 then
-		currentTarget = GetClosestHumanoid()
-		if not currentTarget then return end
-	end
+	if not rightClickHeld or not currentTarget then return end
 
 	local targetHRP = currentTarget.Parent:FindFirstChild("HumanoidRootPart")
 	if not targetHRP then return end
@@ -81,6 +60,3 @@ RunService.RenderStepped:Connect(function()
 	local camPos = Camera.CFrame.Position
 	Camera.CFrame = CFrame.new(camPos, targetHRP.Position)
 end)
-
-
-print("YOU DONT HAVE TO CLOSE AND RE-OPEN THE GAME")
