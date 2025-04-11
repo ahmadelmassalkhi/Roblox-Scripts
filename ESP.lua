@@ -11,7 +11,7 @@ local Camera = Workspace.CurrentCamera
 --// Settings
 local enemyColor = Color3.fromRGB(255, 0, 0)
 local teamColor = Color3.fromRGB(0, 0, 255)
-local maxDistanceSquared = 1000 * 1000
+local maxDistanceSquared = 2000 * 2000
 
 --// Team Detection
 local useTeamColors = Teams and #Teams:GetChildren() > 0
