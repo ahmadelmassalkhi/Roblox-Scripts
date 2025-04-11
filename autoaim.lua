@@ -9,8 +9,22 @@ local Camera = Workspace.CurrentCamera
 local rightClickHeld = false
 local currentTarget = nil
 
+local IGNORE_WALLS = false -- set to true to ignore walls, false to aim only at visible targets
+
 local function IsSameTeam(player)
 	return LocalPlayer.Team and player.Team and LocalPlayer.Team == player.Team
+end
+
+local function IsVisible(targetPos)
+	local origin = Camera.CFrame.Position
+	local direction = (targetPos - origin)
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	raycastParams.IgnoreWater = true
+
+	local result = Workspace:Raycast(origin, direction, raycastParams)
+	return not result or (result.Instance:IsDescendantOf(currentTarget.Parent))
 end
 
 local function GetClosestHumanoid()
@@ -26,6 +40,8 @@ local function GetClosestHumanoid()
 
 		local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
 		if not onScreen then continue end
+
+		if not IGNORE_WALLS and not IsVisible(hrp.Position) then continue end
 
 		local dist = (Vector2.new(screenPos.X, screenPos.Y) - screenCenter).Magnitude
 		if dist < minDist then
